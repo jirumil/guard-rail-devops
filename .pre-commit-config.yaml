@@ -1,0 +1,36 @@
+# Install once: pip install pre-commit && pre-commit install
+# Runs automatically on every `git commit` from then on.
+# Run manually against everything: pre-commit run --all-files
+
+repos:
+  - repo: https://github.com/psf/black
+    rev: 24.4.2
+    hooks:
+      - id: black
+        # Black reformats indentation wholesale on every run, which
+        # incidentally normalizes MOST whitespace irregularities — but
+        # it is not a substitute for check_nbsp.py below. Black's own
+        # tokenizer has been observed to accept \xa0 silently in some
+        # copy-paste paths rather than erroring, which is exactly why
+        # this pre-commit config doesn't rely on Black alone.
+        language_version: python3.12
+
+  - repo: https://github.com/pycqa/flake8
+    rev: 7.1.0
+    hooks:
+      - id: flake8
+        args: ["--max-line-length=100"]
+
+  - repo: local
+    hooks:
+      - id: check-nbsp
+        name: Check for non-breaking spaces / invisible whitespace
+        description: >
+          Purpose-built check for \xa0 and other invisible whitespace
+          characters that break Python's indentation parser while
+          looking identical to normal spaces in most editors. Neither
+          Black nor Flake8 catches this reliably — see scripts/check_nbsp.py
+          for the full explanation and the original bug this guards against.
+        entry: python3 scripts/check_nbsp.py
+        language: system
+        types: [python]

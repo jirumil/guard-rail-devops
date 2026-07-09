@@ -1,0 +1,6 @@
+Flask==3.0.3
+flask-cors==4.0.1
+redis==5.0.7
+rq==1.16.2
+gunicorn==22.0.0
+prometheus_client==0.20.0

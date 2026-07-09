@@ -1,0 +1,9 @@
+# Dev/test-only dependencies. Not installed in production images —
+# services/api/requirements.txt and services/worker/requirements.txt
+# stay minimal on purpose.
+pytest==8.2.2
+fakeredis==2.23.3
+
+# Runtime deps needed to import app.py / worker.py directly for testing
+-r services/api/requirements.txt
+-r services/worker/requirements.txt
