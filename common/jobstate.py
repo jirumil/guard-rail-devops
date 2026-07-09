@@ -14,8 +14,20 @@ _redis_client = None
 def get_redis():
     global _redis_client
     if _redis_client is None:
+        # socket_keepalive + health_check_interval + retry_on_timeout:
+        # Azure Container Apps' ingress (Envoy-based, even for raw TCP)
+        # has been observed silently closing long-idle connections. RQ
+        # workers hold a mostly-idle connection while blocking on the
+        # queue, which is exactly the pattern that gets dropped — this
+        # showed up in production logs as "Connection closed by server"
+        # followed by a 1-second retry loop. These settings make that
+        # drop-and-reconnect happen transparently inside the redis-py
+        # client instead of surfacing as a connection error at all.
         _redis_client = redis.from_url(
-            os.environ.get("REDIS_URL", "redis://redis:6379/0")
+            os.environ.get("REDIS_URL", "redis://redis:6379/0"),
+            socket_keepalive=True,
+            health_check_interval=30,
+            retry_on_timeout=True,
         )
     return _redis_client
 
