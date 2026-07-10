@@ -187,3 +187,24 @@ def _tally(findings: list[dict]) -> dict:
         if cat in counts:
             counts[cat] += 1
     return counts
+
+if __name__ == '__main__':
+    import os
+    import redis
+    from rq import Worker, Connection
+
+    # Grab the URL from your environment, same as jobstate.py
+    redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
+    
+    # The Armor: These settings prevent Azure from severing the idle connection
+    redis_conn = redis.from_url(
+        redis_url,
+        socket_keepalive=True,
+        health_check_interval=30,  # Pings Redis every 30s to keep the wire hot
+        retry_on_timeout=True
+    )
+    
+    logger.info("Starting hardened RQ worker...")
+    with Connection(redis_conn):
+        worker = Worker(['file-scanning'])
+        worker.work()
