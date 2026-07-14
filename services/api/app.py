@@ -12,12 +12,17 @@ from rq import Queue
 sys.path.append("/app/common")
 from jobstate import set_job, get_job  # noqa: E402
 from logutil import configure_logging  # noqa: E402
+from storage import get_storage  # noqa: E402
 import metrics  # noqa: E402
 
 logger = configure_logging("guardrail-api")
 
-UPLOAD_DIR = Path(os.environ.get("UPLOAD_DIR", "/app/uploads"))
-UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+# Private per-container scratch space only — NOT shared with the worker.
+# The API writes an upload here just long enough to hand it to storage.py,
+# then deletes it immediately. This directory's contents are never read
+# by anything outside this process; that assumption was the bug.
+SCRATCH_DIR = Path(os.environ.get("UPLOAD_DIR", "/app/uploads"))
+SCRATCH_DIR.mkdir(parents=True, exist_ok=True)
 
 # GuardRail ingests ANY file type by design — pre-filtering by MIME type
 # would defeat the point of a scanning pipeline. We only cap size, to
@@ -54,6 +59,16 @@ def get_queue():
     if _queue is None:
         _queue = Queue("file-scanning", connection=get_redis_conn())
     return _queue
+
+
+_storage_client = None
+
+
+def get_storage_client():
+    global _storage_client
+    if _storage_client is None:
+        _storage_client = get_storage()
+    return _storage_client
 
 
 @app.get("/healthz")
@@ -121,8 +136,26 @@ def ingest():
     job_id = str(uuid.uuid4())
     original_name = Path(file.filename).name  # strip any path components
     ext = Path(original_name).suffix or ""
-    saved_path = UPLOAD_DIR / f"{job_id}{ext}"
-    file.save(saved_path)
+    storage_key = f"{job_id}{ext}"
+
+    # Write to this container's OWN private scratch space just long enough
+    # to hand the bytes to storage.py — never assumed reachable by the
+    # worker. Deleted immediately after upload, success or failure.
+    scratch_path = SCRATCH_DIR / storage_key
+    file.save(scratch_path)
+
+    try:
+        storage = get_storage_client()
+        storage.upload(
+            key=storage_key,
+            local_path=str(scratch_path),
+            content_type=file.content_type or "application/octet-stream",
+        )
+    except Exception as exc:
+        logger.error("ingest failed: could not upload %s to storage (%s)", storage_key, exc)
+        return jsonify(error="storage upload failed"), 503
+    finally:
+        scratch_path.unlink(missing_ok=True)
 
     set_job(
         job_id,
@@ -138,12 +171,14 @@ def ingest():
         url=None,
     )
 
-    # Enqueue is the seam that becomes an Azure Storage Queue / Service Bus
-    # publish in Phase 3 — the worker side barely changes.
+    # Enqueue the STORAGE KEY, not a filesystem path — the worker fetches
+    # the file's bytes through storage.py's download(), the same
+    # abstraction the API just used to upload it. Neither side ever
+    # assumes the other's local disk is reachable.
     get_queue().enqueue(
         "worker.scan_file",
         job_id,
-        str(saved_path),
+        storage_key,
         ext,
         file.content_type or "application/octet-stream",
         original_name,

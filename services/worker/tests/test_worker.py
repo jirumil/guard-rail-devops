@@ -6,6 +6,8 @@ _scan_text_content) with no Redis or MinIO involved — importing `worker`
 no longer touches the network at import time (storage is lazy now), so
 these tests run in isolation, fast, with zero live infrastructure.
 """
+import os
+
 import worker
 
 
@@ -104,88 +106,101 @@ class TestTextContentScanning:
         assert "malware" in categories
 
 
+class FakeBlobStorage:
+    """Stands in for a real object store in tests. `contents` maps a
+    storage key to the bytes/text that would have been uploaded there —
+    download() writes that content to whatever scratch path scan_file
+    requests, mirroring what a real MinIO/Blob download would do."""
+
+    def __init__(self, contents: dict[str, str]):
+        self.contents = contents
+        self.deleted_keys = []
+
+    def download(self, key, local_path):
+        with open(local_path, "w") as f:
+            f.write(self.contents[key])
+
+    def get_url(self, key):
+        return f"http://fake/{key}"
+
+    def delete(self, key):
+        self.deleted_keys.append(key)
+
+
 class TestScanFileIntegration:
     """Exercises the full scan_file() orchestration with storage, jobstate,
     and metrics all faked out — verifies the wiring, not the infra."""
 
-    def test_clean_file_produces_success_status(self, tmp_path, monkeypatch):
+    def test_clean_file_produces_success_status(self, monkeypatch):
         recorded_updates = []
         monkeypatch.setattr(worker, "update_job", lambda job_id, **fields: recorded_updates.append(fields))
 
-        fake_storage = type("FakeStorage", (), {
-            "upload": lambda self, key, local_path, content_type: "http://fake/url",
-            "delete": lambda self, key: None,
-        })()
+        fake_storage = FakeBlobStorage({"job-1.txt": "nothing suspicious here"})
         monkeypatch.setattr(worker, "_get_storage_client", lambda: fake_storage)
         monkeypatch.setattr(worker.metrics, "incr", lambda *a, **k: None)
         monkeypatch.setattr(worker.time, "sleep", lambda *_: None)  # skip the artificial delay
 
-        f = tmp_path / "clean.txt"
-        f.write_text("nothing suspicious here")
-
-        worker.scan_file("job-1", str(f), ".txt", "text/plain", "clean.txt")
+        worker.scan_file("job-1", "job-1.txt", ".txt", "text/plain", "clean.txt")
 
         final = recorded_updates[-1]
         assert final["status"] == "success"
         assert final["verdict"] == "clean"
         assert final["findings"] == []
 
-    def test_malicious_file_produces_quarantined_verdict(self, tmp_path, monkeypatch):
+    def test_malicious_file_produces_quarantined_verdict(self, monkeypatch):
         recorded_updates = []
         monkeypatch.setattr(worker, "update_job", lambda job_id, **fields: recorded_updates.append(fields))
 
-        fake_storage = type("FakeStorage", (), {
-            "upload": lambda self, key, local_path, content_type: "http://fake/url",
-            "delete": lambda self, key: None,
-        })()
+        fake_storage = FakeBlobStorage({"job-2.py": "eval(payload)"})
         monkeypatch.setattr(worker, "_get_storage_client", lambda: fake_storage)
         monkeypatch.setattr(worker.metrics, "incr", lambda *a, **k: None)
         monkeypatch.setattr(worker.time, "sleep", lambda *_: None)
 
-        f = tmp_path / "bad.py"
-        f.write_text("eval(payload)")
-
-        worker.scan_file("job-2", str(f), ".py", "text/x-python", "bad.py")
+        worker.scan_file("job-2", "job-2.py", ".py", "text/x-python", "bad.py")
 
         final = recorded_updates[-1]
         assert final["status"] == "success"
         assert final["verdict"] == "quarantined"
         assert len(final["findings"]) >= 1
 
-    def test_local_file_deleted_after_scan(self, tmp_path, monkeypatch):
+    def test_storage_key_deleted_after_scan(self, monkeypatch):
+        """Regression test: the API-uploaded blob must not survive the
+        scan — this is the compliance-footer claim made literally true."""
         monkeypatch.setattr(worker, "update_job", lambda *a, **k: None)
-        fake_storage = type("FakeStorage", (), {
-            "upload": lambda self, key, local_path, content_type: "http://fake/url",
-            "delete": lambda self, key: None,
-        })()
+        fake_storage = FakeBlobStorage({"job-3.txt": "hello"})
         monkeypatch.setattr(worker, "_get_storage_client", lambda: fake_storage)
         monkeypatch.setattr(worker.metrics, "incr", lambda *a, **k: None)
         monkeypatch.setattr(worker.time, "sleep", lambda *_: None)
 
-        f = tmp_path / "temp.txt"
-        f.write_text("hello")
-        assert f.exists()
+        worker.scan_file("job-3", "job-3.txt", ".txt", "text/plain", "temp.txt")
 
-        worker.scan_file("job-3", str(f), ".txt", "text/plain", "temp.txt")
+        assert "job-3.txt" in fake_storage.deleted_keys
 
-        # This is the regression test for the disk-cleanup bug this
-        # hardening pass fixed — the local copy must not survive the scan.
-        assert not f.exists()
+    def test_local_scratch_copy_deleted_after_scan(self, monkeypatch):
+        """Regression test: the worker's OWN downloaded scratch copy must
+        not survive the scan either — the disk-cleanup fix applies to
+        both the blob and the worker's private temp file."""
+        monkeypatch.setattr(worker, "update_job", lambda *a, **k: None)
+        fake_storage = FakeBlobStorage({"job-5.txt": "hello"})
+        monkeypatch.setattr(worker, "_get_storage_client", lambda: fake_storage)
+        monkeypatch.setattr(worker.metrics, "incr", lambda *a, **k: None)
+        monkeypatch.setattr(worker.time, "sleep", lambda *_: None)
 
-    def test_exception_during_scan_sets_error_status(self, tmp_path, monkeypatch):
+        worker.scan_file("job-5", "job-5.txt", ".txt", "text/plain", "temp.txt")
+
+        assert not os.path.exists(f"{worker.SCRATCH_DIR}/job-5.txt")
+
+    def test_exception_during_scan_sets_error_status(self, monkeypatch):
         recorded_updates = []
         monkeypatch.setattr(worker, "update_job", lambda job_id, **fields: recorded_updates.append(fields))
         monkeypatch.setattr(worker.metrics, "incr", lambda *a, **k: None)
         monkeypatch.setattr(worker.time, "sleep", lambda *_: None)
 
         def broken_storage_client():
-            raise ConnectionError("MinIO unreachable")
+            raise ConnectionError("storage unreachable")
         monkeypatch.setattr(worker, "_get_storage_client", broken_storage_client)
 
-        f = tmp_path / "ok.txt"
-        f.write_text("hello")
-
-        worker.scan_file("job-4", str(f), ".txt", "text/plain", "ok.txt")
+        worker.scan_file("job-4", "job-4.txt", ".txt", "text/plain", "ok.txt")
 
         final = recorded_updates[-1]
         assert final["status"] == "error"

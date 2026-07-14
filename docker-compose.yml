@@ -16,10 +16,10 @@ services:
     ports:
       - "5000:5000"
     env_file: .env
-    volumes:
-      - uploads:/app/uploads
     depends_on:
       redis:
+        condition: service_healthy
+      minio:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
@@ -33,8 +33,6 @@ services:
       context: .
       dockerfile: services/worker/Dockerfile
     env_file: .env
-    volumes:
-      - uploads:/app/uploads
     depends_on:
       redis:
         condition: service_healthy
@@ -74,5 +72,4 @@ services:
     restart: unless-stopped
 
 volumes:
-  uploads:
   minio-data:

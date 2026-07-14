@@ -17,4 +17,4 @@ COPY services/worker/worker.py .
 ENV PATH=/home/appuser/.local/bin:$PATH \
     PYTHONUNBUFFERED=1
 USER appuser
-CMD ["python", "worker.py"]
+CMD ["rq", "worker", "file-scanning", "--path", ".", "--url", "redis://redis:6379/0"]

@@ -68,16 +68,33 @@ TEXT_SCAN_EXTENSIONS = {".txt", ".py", ".js", ".sh", ".php", ".json", ".yml", ".
 MAX_SCAN_BYTES = 2 * 1024 * 1024  # bound the read so a huge text file can't stall a worker
 
 
-def scan_file(job_id: str, local_path: str, ext: str, content_type: str, original_name: str):
+SCRATCH_DIR = "/tmp"
+
+
+def scan_file(job_id: str, storage_key: str, ext: str, content_type: str, original_name: str):
     """RQ entrypoint. Runs in the worker container, isolated from the API's
     request/response cycle — the API's latency never depends on how long
-    this function takes or how deep the queue backlog is."""
+    this function takes or how deep the queue backlog is.
+
+    storage_key identifies the file in object storage — NOT a filesystem
+    path. This worker has no assumptions about the API's local disk; the
+    only way it gets the file's bytes is by downloading them through the
+    same storage.py abstraction the API used to upload them. That
+    boundary is the fix for the "file not found" cross-container bug:
+    there is no shared filesystem to be wrong about anymore.
+    """
+    scratch_path = f"{SCRATCH_DIR}/{job_id}{ext}"
     try:
         logger.info("scan started job_id=%s filename=%s", job_id, original_name)
+        update_job(job_id, status="scanning", progress=40, detail="Retrieving file from secure storage")
+
+        storage = _get_storage_client()
+        storage.download(storage_key, scratch_path)
+
         update_job(job_id, status="scanning", progress=50, detail="Running heuristic threat scan")
         time.sleep(1.2)  # simulate meaningful scan work
 
-        findings = _run_heuristics(ext.lower(), local_path)
+        findings = _run_heuristics(ext.lower(), scratch_path)
         counts = _tally(findings)
         verdict = "quarantined" if findings else "clean"
         summary = (
@@ -86,10 +103,10 @@ def scan_file(job_id: str, local_path: str, ext: str, content_type: str, origina
             f"patterns identified"
         )
 
-        update_job(job_id, status="uploading", progress=80, detail="Archiving to secure sandbox")
-        key = f"{job_id}{ext}"
-        storage = _get_storage_client()
-        url = storage.upload(key=key, local_path=local_path, content_type=content_type)
+        # The API already uploaded this file to storage at ingest time —
+        # no re-upload needed here. Just fetch a fresh retrieval URL for
+        # the existing blob before it gets deleted below.
+        url = storage.get_url(storage_key)
 
         update_job(
             job_id,
@@ -104,11 +121,9 @@ def scan_file(job_id: str, local_path: str, ext: str, content_type: str, origina
 
         # Compliance footer claims immediate deletion post-analysis — make
         # that literally true in both places the file exists: the object
-        # store copy AND the shared uploads volume. Deleting only the MinIO
-        # copy (the original oversight here) leaves the raw file sitting on
-        # disk indefinitely — a real gap, now closed.
-        storage.delete(key)
-        _cleanup_local_file(local_path)
+        # store copy AND this worker's own scratch download.
+        storage.delete(storage_key)
+        _cleanup_local_file(scratch_path)
 
         metrics.incr("scans_total")
         metrics.incr("scans_clean_total" if verdict == "clean" else "scans_quarantined_total")
@@ -122,7 +137,7 @@ def scan_file(job_id: str, local_path: str, ext: str, content_type: str, origina
         logger.error("scan failed job_id=%s error=%s", job_id, exc)
         update_job(job_id, status="error", detail=str(exc), verdict="error", summary="Scan failed")
         metrics.incr("scans_failed_total")
-        _cleanup_local_file(local_path)
+        _cleanup_local_file(scratch_path)
 
 
 def _cleanup_local_file(local_path: str) -> None:
@@ -187,24 +202,3 @@ def _tally(findings: list[dict]) -> dict:
         if cat in counts:
             counts[cat] += 1
     return counts
-
-if __name__ == '__main__':
-    import os
-    import redis
-    from rq import Worker, Connection
-
-    # Grab the URL from your environment, same as jobstate.py
-    redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
-    
-    # The Armor: These settings prevent Azure from severing the idle connection
-    redis_conn = redis.from_url(
-        redis_url,
-        socket_keepalive=True,
-        health_check_interval=30,  # Pings Redis every 30s to keep the wire hot
-        retry_on_timeout=True
-    )
-    
-    logger.info("Starting hardened RQ worker...")
-    with Connection(redis_conn):
-        worker = Worker(['file-scanning'])
-        worker.work()

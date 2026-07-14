@@ -10,6 +10,15 @@ Phase 3 (Azure):   backed by Azure Blob Storage via the azure-storage-blob
 Provider selection is driven entirely by the STORAGE_PROVIDER env var:
     STORAGE_PROVIDER=azure  (or unset) -> AzureBlobStorage  [default]
     STORAGE_PROVIDER=minio             -> MinioStorage      [local dev]
+
+ARCHITECTURE NOTE (blob-routing refactor): the API now uploads a file to
+this storage layer at ingest time and enqueues a storage KEY, not a
+filesystem path. The worker downloads that key to its own private
+scratch space before scanning. Neither side ever assumes the other's
+local disk is reachable — that assumption was the root cause of the
+"file not found" bug this refactor eliminates. download() exists
+specifically to support that: the worker's only way to get the file's
+bytes is through this interface, the same as upload always has been.
 """
 import os
 from abc import ABC, abstractmethod
@@ -20,6 +29,12 @@ class ObjectStorage(ABC):
     @abstractmethod
     def upload(self, key: str, local_path: str, content_type: str) -> str:
         """Uploads a file and returns a retrievable URL."""
+
+    @abstractmethod
+    def download(self, key: str, local_path: str) -> None:
+        """Downloads a stored object to a local path. This is how the
+        worker gets file bytes onto its own disk — never by assuming
+        another container's filesystem is reachable."""
 
     @abstractmethod
     def get_url(self, key: str) -> str:
@@ -64,6 +79,9 @@ class MinioStorage(ObjectStorage):
             local_path, self.bucket, key, ExtraArgs={"ContentType": content_type}
         )
         return self.get_url(key)
+
+    def download(self, key: str, local_path: str) -> None:
+        self.client.download_file(self.bucket, key, local_path)
 
     def get_url(self, key: str) -> str:
         return f"{self.public_base_url}/{self.bucket}/{key}"
@@ -119,6 +137,14 @@ class AzureBlobStorage(ObjectStorage):
                 content_settings=ContentSettings(content_type=content_type),
             )
         return self.get_url(key)
+
+    def download(self, key: str, local_path: str) -> None:
+        blob_client = self.service_client.get_blob_client(
+            container=self.container_name, blob=key
+        )
+        with open(local_path, "wb") as f:
+            download_stream = blob_client.download_blob()
+            f.write(download_stream.readall())
 
     def get_url(self, key: str) -> str:
         from azure.storage.blob import BlobSasPermissions, generate_blob_sas
