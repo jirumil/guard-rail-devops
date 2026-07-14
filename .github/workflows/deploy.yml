@@ -10,7 +10,11 @@ env:
   ACR_LOGIN_SERVER: guardrailcrdev2026v2.azurecr.io
 
 jobs:
-  test:
+  # ---------------------------------------------------------------------
+  # 1. Lint + test the Python services. Nothing downstream runs if this
+  #    fails — a red test suite or a lint violation blocks the build.
+  # ---------------------------------------------------------------------
+  lint-and-test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -18,27 +22,41 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: "pip"
 
-      - name: Install test dependencies
-        run: pip install -r requirements-dev.txt
+      - name: Install dependencies
+        run: |
+          pip install -r requirements-dev.txt
+          pip install black==24.4.2 flake8==7.1.0
 
-      - name: Run test suite
-        run: pytest
+      - name: Lint (flake8)
+        run: flake8 --max-line-length=100 common/ services/ scripts/
+
+      - name: Format check (black)
+        run: black --check common/ services/ scripts/
 
       - name: Check for non-breaking spaces / mixed indentation
         run: python3 scripts/check_nbsp.py $(git ls-files '*.py')
 
+      - name: Run test suite
+        run: pytest
+
+  # ---------------------------------------------------------------------
+  # 2. Build + push each service image, tagged with the immutable git
+  #    SHA (never :latest — see infra/terraform/variables.tf validation).
+  #    Matrix keeps the three near-identical build steps in one place.
+  # ---------------------------------------------------------------------
   build-and-push:
-    needs: test
+    needs: lint-and-test
     runs-on: ubuntu-latest
     outputs:
       image_tag: ${{ steps.tag.outputs.tag }}
+    strategy:
+      matrix:
+        service: [api, worker, frontend]
     steps:
       - uses: actions/checkout@v4
 
-      # Immutable tag — the short git SHA. Never :latest. See
-      # variables.tf's validation blocks for why this is now enforced,
-      # not just a convention.
       - id: tag
         run: echo "tag=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
 
@@ -50,30 +68,28 @@ jobs:
       - name: Log in to ACR
         run: az acr login --name ${{ env.ACR_NAME }}
 
-      - name: Build & push api
+      - name: Build & push ${{ matrix.service }}
         run: |
-          docker build -f services/api/Dockerfile \
+          docker build -f services/${{ matrix.service }}/Dockerfile \
             --build-arg GIT_SHA=${{ steps.tag.outputs.tag }} \
-            -t ${{ env.ACR_LOGIN_SERVER }}/guardrail-api:${{ steps.tag.outputs.tag }} .
-          docker push ${{ env.ACR_LOGIN_SERVER }}/guardrail-api:${{ steps.tag.outputs.tag }}
+            -t ${{ env.ACR_LOGIN_SERVER }}/guardrail-${{ matrix.service }}:${{ steps.tag.outputs.tag }} .
+          docker push ${{ env.ACR_LOGIN_SERVER }}/guardrail-${{ matrix.service }}:${{ steps.tag.outputs.tag }}
 
-      - name: Build & push worker
-        run: |
-          docker build -f services/worker/Dockerfile \
-            --build-arg GIT_SHA=${{ steps.tag.outputs.tag }} \
-            -t ${{ env.ACR_LOGIN_SERVER }}/guardrail-worker:${{ steps.tag.outputs.tag }} .
-          docker push ${{ env.ACR_LOGIN_SERVER }}/guardrail-worker:${{ steps.tag.outputs.tag }}
-
-      - name: Build & push frontend
-        run: |
-          docker build -f services/frontend/Dockerfile \
-            --build-arg GIT_SHA=${{ steps.tag.outputs.tag }} \
-            -t ${{ env.ACR_LOGIN_SERVER }}/guardrail-frontend:${{ steps.tag.outputs.tag }} .
-          docker push ${{ env.ACR_LOGIN_SERVER }}/guardrail-frontend:${{ steps.tag.outputs.tag }}
-
-  deploy:
+  # ---------------------------------------------------------------------
+  # 3. Terraform plan, then apply that exact plan file — never a
+  #    freestanding `apply`, so what gets applied is what was reviewed
+  #    in the logs, not a second, potentially-drifted evaluation.
+  # ---------------------------------------------------------------------
+  terraform:
     needs: build-and-push
     runs-on: ubuntu-latest
+    env:
+      TF_VAR_api_image_tag: ${{ needs.build-and-push.outputs.image_tag }}
+      TF_VAR_worker_image_tag: ${{ needs.build-and-push.outputs.image_tag }}
+      TF_VAR_frontend_image_tag: ${{ needs.build-and-push.outputs.image_tag }}
+    defaults:
+      run:
+        working-directory: infra/terraform
     steps:
       - uses: actions/checkout@v4
 
@@ -87,13 +103,13 @@ jobs:
           terraform_version: "1.7.5"
 
       - name: Terraform Init
-        working-directory: infra/terraform
         run: terraform init
 
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Plan
+        run: terraform plan -out=tfplan
+
       - name: Terraform Apply
-        working-directory: infra/terraform
-        run: |
-          terraform apply -auto-approve \
-            -var="api_image_tag=${{ needs.build-and-push.outputs.image_tag }}" \
-            -var="worker_image_tag=${{ needs.build-and-push.outputs.image_tag }}" \
-            -var="frontend_image_tag=${{ needs.build-and-push.outputs.image_tag }}"
+        run: terraform apply -auto-approve tfplan
