@@ -65,8 +65,7 @@ resource "azurerm_container_app" "api" {
   template {
     container {
       name   = "api"
-      image  = "${data.azurerm_container_registry.v2.login_server}/guardrail-api:${var.image_tag}" 
-      cpu    = "0.5"
+      image  = "${data.azurerm_container_registry.v2.login_server}/guardrail-api:${var.api_image_tag}"
       memory = "1.0Gi"
 
       # FIXED: Added Gunicorn tuning configurations to stop it killing its own workers early
