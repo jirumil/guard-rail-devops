@@ -21,9 +21,12 @@ logger = configure_logging("guardrail-api")
 # The API writes an upload here just long enough to hand it to storage.py,
 # then deletes it immediately. This directory's contents are never read
 # by anything outside this process; that assumption was the bug.
-SCRATCH_DIR = Path(os.environ.get("UPLOAD_DIR", "/app/uploads"))
-SCRATCH_DIR.mkdir(parents=True, exist_ok=True)
-
+try:
+    SCRATCH_DIR = Path(os.environ.get("UPLOAD_DIR", "/app/uploads"))
+    SCRATCH_DIR.mkdir(parents=True, exist_ok=True)
+except PermissionError: 
+    SCRATCH_DIR = Path("./uploads")
+    SCRATCH_DIR.mkdir(parents=True, exist_ok=True)
 # GuardRail ingests ANY file type by design — pre-filtering by MIME type
 # would defeat the point of a scanning pipeline. We only cap size, to
 # protect the API's own request-handling resources.
