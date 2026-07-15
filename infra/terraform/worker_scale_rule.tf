@@ -17,7 +17,7 @@
 
 resource "azurerm_container_app" "worker" {
   name                         = "guardrail-worker"
-  resource_group_name          = azurerm_resource_group.main.name
+  resource_group_name          = data.azurerm_resource_group.main.name
   container_app_environment_id = azurerm_container_app_environment.main.id
   revision_mode                = "Single"
 
