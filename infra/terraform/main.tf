@@ -25,15 +25,17 @@ import {
   id = "/subscriptions/039f6f22-d707-42bb-8d89-0125f1069e3f/resourceGroups/rg-guardrail-dev-app/providers/Microsoft.App/containerApps/guardrail-redis"
 }
 
-import {
-  to = azurerm_container_app.api
-  id = "/subscriptions/039f6f22-d707-42bb-8d89-0125f1069e3f/resourceGroups/rg-guardrail-dev-app/providers/Microsoft.App/containerApps/guardrail-api"
-}
+# COMMENTED OUT: Bypasses the broken provisioning states to let Terraform cleanly overwrite them
+# import {
+#   to = azurerm_container_app.api
+#   id = "/subscriptions/039f6f22-d707-42bb-8d89-0125f1069e3f/resourceGroups/rg-guardrail-dev-app/providers/Microsoft.App/containerApps/guardrail-api"
+# }
 
-import {
-  to = azurerm_container_app.worker
-  id = "/subscriptions/039f6f22-d707-42bb-8d89-0125f1069e3f/resourceGroups/rg-guardrail-dev-app/providers/Microsoft.App/containerApps/guardrail-worker"
-}
+# COMMENTED OUT: Bypasses the broken provisioning states to let Terraform cleanly overwrite them
+# import {
+#   to = azurerm_container_app.worker
+#   id = "/subscriptions/039f6f22-d707-42bb-8d89-0125f1069e3f/resourceGroups/rg-guardrail-dev-app/providers/Microsoft.App/containerApps/guardrail-worker"
+# }
 
 import {
   to = azurerm_container_app.frontend
