@@ -16,15 +16,15 @@ resource "azurerm_container_app" "redis" {
   }
 
   template {
-    # FIXED: Moved cpu and memory up to the template block level
-    cpu          = "0.25"
-    memory       = "0.5Gi"
     min_replicas = 1
     max_replicas = 1
 
     container {
       name    = "redis"
       image   = "redis:7.4-alpine"
+      # FIXED: Placed back inside container block, wrapped in strict quotes
+      cpu     = "0.25"
+      memory  = "0.5Gi"
       command = ["redis-server", "--requirepass", "$(REDIS_PASSWORD)"]
 
       env {
@@ -35,10 +35,10 @@ resource "azurerm_container_app" "redis" {
   }
 
   ingress {
-    external_enabled = false  # Keeps it locked inside your private cluster environment
-    target_port      = 6379   # The port Redis listens to inside its own container
-    exposed_port     = 6379   # FIXED: Allocates a dedicated internal proxy port for your architecture mesh
-    transport        = "tcp"  # FIXED: Reverted back to native TCP
+    external_enabled = false  
+    target_port      = 6379   
+    exposed_port     = 6379   
+    transport        = "tcp"  
     traffic_weight {
       latest_revision = true
       percentage      = 100
@@ -65,17 +65,16 @@ resource "azurerm_container_app" "api" {
   }
 
   template {
-    # FIXED: Moved cpu and memory up to the template block level
-    cpu          = "0.5"
-    memory       = "1.0Gi"
     min_replicas = 1
     max_replicas = 3
 
     container {
       name  = "api"
       image = "${data.azurerm_container_registry.v2.login_server}/guardrail-api:${var.api_image_tag}"
+      # FIXED: Placed back inside container block, wrapped in strict quotes
+      cpu     = "0.5"
+      memory  = "1.0Gi"
 
-      # FIXED: Added Gunicorn tuning configurations to stop it killing its own workers early
       env {
         name  = "GUNICORN_CMD_ARGS"
         value = "--timeout 120 --keep-alive 10 --workers 2"
@@ -90,8 +89,8 @@ resource "azurerm_container_app" "api" {
         transport               = "HTTP"
         path                    = "/healthz"
         port                    = 5000
-        initial_delay           = 45  # FIXED: Prevents premature platform termination
-        timeout                 = 10  # FIXED: Gives breathing room for slow responses
+        initial_delay           = 45  
+        timeout                 = 10  
         failure_count_threshold = 3
       }
     }
@@ -126,15 +125,15 @@ resource "azurerm_container_app" "frontend" {
   }
 
   template {
-    # FIXED: Moved cpu and memory up to template block level to remain consistent
-    cpu          = "0.25"
-    memory       = "0.5Gi"
     min_replicas = 1
     max_replicas = 2
 
     container {
       name  = "frontend"
       image = "${azurerm_container_registry.main.login_server}/guardrail-frontend:${var.frontend_image_tag}"
+      # FIXED: Placed back inside container block, wrapped in strict quotes
+      cpu    = "0.25"
+      memory = "0.5Gi"
 
       env {
         name  = "API_BASE_URL"
