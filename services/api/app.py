@@ -24,9 +24,11 @@ logger = configure_logging("guardrail-api")
 try:
     SCRATCH_DIR = Path(os.environ.get("UPLOAD_DIR", "/app/uploads"))
     SCRATCH_DIR.mkdir(parents=True, exist_ok=True)
-except PermissionError: 
+except PermissionError:
+    # Fallback path for GitHub Actions environment where root /app is write-locked
     SCRATCH_DIR = Path("./uploads")
     SCRATCH_DIR.mkdir(parents=True, exist_ok=True)
+
 # GuardRail ingests ANY file type by design — pre-filtering by MIME type
 # would defeat the point of a scanning pipeline. We only cap size, to
 # protect the API's own request-handling resources.
@@ -93,10 +95,26 @@ def prometheus_metrics():
     registry = CollectorRegistry()
     q = get_queue()
 
-    Gauge("guardrail_queue_depth", "Jobs waiting to be picked up by a worker", registry=registry).set(len(q))
-    Gauge("guardrail_queue_started", "Jobs currently being processed by a worker", registry=registry).set(len(q.started_job_registry))
-    Gauge("guardrail_queue_failed", "Jobs that raised an exception (dead-letter visibility)", registry=registry).set(len(q.failed_job_registry))
-    Gauge("guardrail_queue_finished", "Jobs completed since the queue was created", registry=registry).set(len(q.finished_job_registry))
+    Gauge(
+        "guardrail_queue_depth",
+        "Jobs waiting to be picked up by a worker",
+        registry=registry
+    ).set(len(q))
+    Gauge(
+        "guardrail_queue_started",
+        "Jobs currently being processed by a worker",
+        registry=registry
+    ).set(len(q.started_job_registry))
+    Gauge(
+        "guardrail_queue_failed",
+        "Jobs that raised an exception (dead-letter visibility)",
+        registry=registry
+    ).set(len(q.failed_job_registry))
+    Gauge(
+        "guardrail_queue_finished",
+        "Jobs completed since the queue was created",
+        registry=registry
+    ).set(len(q.finished_job_registry))
 
     counter_metrics = {
         "guardrail_scans_total": "scans_total",
@@ -108,7 +126,11 @@ def prometheus_metrics():
         "guardrail_findings_spyware_total": "findings_spyware_total",
     }
     for metric_name, redis_key in counter_metrics.items():
-        Gauge(metric_name, f"GuardRail counter: {redis_key}", registry=registry).set(metrics.get(redis_key))
+        Gauge(
+            metric_name,
+            f"GuardRail counter: {redis_key}",
+            registry=registry
+        ).set(metrics.get(redis_key))
 
     return Response(generate_latest(registry), mimetype=CONTENT_TYPE_LATEST)
 
