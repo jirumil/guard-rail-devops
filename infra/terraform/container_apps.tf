@@ -1,15 +1,14 @@
-resource "azurerm_container_app_environment" "main" {
-  name                       = "cae-${var.project}-${var.environment}-v2"
-  resource_group_name        = data.azurerm_resource_group.main.name     # <-- Fixed reference
-  location                   = data.azurerm_resource_group.main.location # <-- Fixed reference
-  log_analytics_workspace_id = azurerm_log_analytics_workspace.main.id
+# 1. Changed to a data block to read the existing environment
+data "azurerm_container_app_environment" "main" {
+  name                = "cae-guardrail-dev"
+  resource_group_name = data.azurerm_resource_group.main.name
 }
 
-# ---- Redis as a Container App (avoids Azure Cache for Redis cost) ----
+# ---- Redis as a Container App ----
 resource "azurerm_container_app" "redis" {
   name                         = "${var.project}-redis"
-  resource_group_name          = data.azurerm_resource_group.main.name   # <-- Fixed reference
-  container_app_environment_id = azurerm_container_app_environment.main.id
+  resource_group_name          = data.azurerm_resource_group.main.name
+  container_app_environment_id = data.azurerm_container_app_environment.main.id # <-- Updated reference
   revision_mode                = "Single"
 
   secret {
@@ -35,10 +34,10 @@ resource "azurerm_container_app" "redis" {
   }
 
   ingress {
-    external_enabled = false  # Keeps it locked inside your private cluster environment
-    target_port      = 6379   # The port Redis listens to inside its own container
-    exposed_port     = 6379   # FIXED: Allocates a dedicated internal proxy port for your architecture mesh
-    transport        = "tcp"  # FIXED: Reverted back to native TCP
+    external_enabled = false  
+    target_port      = 6379   
+    exposed_port     = 6379   
+    transport        = "tcp"  
     traffic_weight {
       latest_revision = true
       percentage      = 100
@@ -49,8 +48,8 @@ resource "azurerm_container_app" "redis" {
 # ---- API ----
 resource "azurerm_container_app" "api" {
   name                         = "${var.project}-api"
-  resource_group_name          = data.azurerm_resource_group.main.name   # <-- Fixed reference
-  container_app_environment_id = azurerm_container_app_environment.main.id
+  resource_group_name          = data.azurerm_resource_group.main.name
+  container_app_environment_id = data.azurerm_container_app_environment.main.id # <-- Updated reference
   revision_mode                = "Single"
 
   registry {
@@ -71,18 +70,11 @@ resource "azurerm_container_app" "api" {
       cpu    = 0.5
       memory = "1Gi"
 
-      # FIXED: Added Gunicorn tuning configurations to stop it killing its own workers early
       env {
         name  = "GUNICORN_CMD_ARGS"
         value = "--timeout 120 --keep-alive 10 --workers 2"
       }
 
-      # REDEPLOY_TRICK removed — was a cache-busting workaround for the
-      # api_image_tag defaulting to "latest" (a mutable tag Terraform
-      # can't diff). Now that api_image_tag has no default and is
-      # validated to reject "latest" outright (see variables.tf), a real
-      # tag change is guaranteed on every deploy — this workaround is no
-      # longer structurally possible to need.
       env {
         name  = "REDIS_URL"
         value = "redis://:${random_password.redis.result}@${azurerm_container_app.redis.name}:6379/0"
@@ -91,8 +83,8 @@ resource "azurerm_container_app" "api" {
         transport               = "HTTP"
         path                    = "/healthz"
         port                    = 5000
-        initial_delay           = 45  # FIXED: Prevents premature platform termination
-        timeout                 = 10  # FIXED: Gives breathing room for slow responses
+        initial_delay           = 45  
+        timeout                 = 10  
         failure_count_threshold = 3
       }
     }
@@ -113,8 +105,8 @@ resource "azurerm_container_app" "api" {
 # ---- Frontend ----
 resource "azurerm_container_app" "frontend" {
   name                         = "${var.project}-frontend"
-  resource_group_name          = data.azurerm_resource_group.main.name   # <-- Fixed reference
-  container_app_environment_id = azurerm_container_app_environment.main.id
+  resource_group_name          = data.azurerm_resource_group.main.name
+  container_app_environment_id = data.azurerm_container_app_environment.main.id # <-- Updated reference
   revision_mode                = "Single"
 
   registry {
