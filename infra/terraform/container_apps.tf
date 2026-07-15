@@ -16,11 +16,15 @@ resource "azurerm_container_app" "redis" {
   }
 
   template {
+    # FIXED: Moved cpu and memory up to the template block level
+    cpu          = "0.25"
+    memory       = "0.5Gi"
+    min_replicas = 1
+    max_replicas = 1
+
     container {
       name    = "redis"
       image   = "redis:7.4-alpine"
-      cpu     = 0.25
-      memory  = "0.5Gi"
       command = ["redis-server", "--requirepass", "$(REDIS_PASSWORD)"]
 
       env {
@@ -28,8 +32,6 @@ resource "azurerm_container_app" "redis" {
         secret_name = "redis-password"
       }
     }
-    min_replicas = 1
-    max_replicas = 1
   }
 
   ingress {
@@ -63,10 +65,15 @@ resource "azurerm_container_app" "api" {
   }
 
   template {
+    # FIXED: Moved cpu and memory up to the template block level
+    cpu          = "0.5"
+    memory       = "1.0Gi"
+    min_replicas = 1
+    max_replicas = 3
+
     container {
-      name   = "api"
-      image  = "${data.azurerm_container_registry.v2.login_server}/guardrail-api:${var.api_image_tag}"
-      memory = "1.0Gi"
+      name  = "api"
+      image = "${data.azurerm_container_registry.v2.login_server}/guardrail-api:${var.api_image_tag}"
 
       # FIXED: Added Gunicorn tuning configurations to stop it killing its own workers early
       env {
@@ -74,16 +81,11 @@ resource "azurerm_container_app" "api" {
         value = "--timeout 120 --keep-alive 10 --workers 2"
       }
 
-      # REDEPLOY_TRICK removed — was a cache-busting workaround for the
-      # api_image_tag defaulting to "latest" (a mutable tag Terraform
-      # can't diff). Now that api_image_tag has no default and is
-      # validated to reject "latest" outright (see variables.tf), a real
-      # tag change is guaranteed on every deploy — this workaround is no
-      # longer structurally possible to need.
       env {
         name  = "REDIS_URL"
         value = "redis://:${random_password.redis.result}@${azurerm_container_app.redis.name}:6379/0"
       }
+
       liveness_probe {
         transport               = "HTTP"
         path                    = "/healthz"
@@ -93,8 +95,6 @@ resource "azurerm_container_app" "api" {
         failure_count_threshold = 3
       }
     }
-    min_replicas = 1
-    max_replicas = 3
   }
 
   ingress {
@@ -126,19 +126,21 @@ resource "azurerm_container_app" "frontend" {
   }
 
   template {
+    # FIXED: Moved cpu and memory up to template block level to remain consistent
+    cpu          = "0.25"
+    memory       = "0.5Gi"
+    min_replicas = 1
+    max_replicas = 2
+
     container {
-      name   = "frontend"
-      image  = "${azurerm_container_registry.main.login_server}/guardrail-frontend:${var.frontend_image_tag}"
-      cpu    = "0.25"
-      memory = "0.5Gi"
+      name  = "frontend"
+      image = "${azurerm_container_registry.main.login_server}/guardrail-frontend:${var.frontend_image_tag}"
 
       env {
         name  = "API_BASE_URL"
         value = "https://${azurerm_container_app.api.ingress[0].fqdn}"
       }
     }
-    min_replicas = 1
-    max_replicas = 2
   }
 
   ingress {
