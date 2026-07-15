@@ -12,7 +12,7 @@ data "azurerm_container_app" "redis" {
 
 # ---- API ----
 resource "azurerm_container_app" "api" {
-  name                         = "${var.project}-api"
+  name                         = "${var.project}-api-v2"
   resource_group_name          = data.azurerm_resource_group.main.name
   container_app_environment_id = data.azurerm_container_app_environment.main.id
   revision_mode                = "Single"
