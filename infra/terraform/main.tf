@@ -25,19 +25,19 @@ import {
   id = "/subscriptions/039f6f22-d707-42bb-8d89-0125f1069e3f/resourceGroups/rg-guardrail-dev-app/providers/Microsoft.App/containerApps/guardrail-redis"
 }
 
-# COMMENTED OUT: Bypasses the broken provisioning states to let Terraform cleanly overwrite them
-# import {
-#   to = azurerm_container_app.api
-#   id = "/subscriptions/039f6f22-d707-42bb-8d89-0125f1069e3f/resourceGroups/rg-guardrail-dev-app/providers/Microsoft.App/containerApps/guardrail-api"
-# }
+# RESTORED: Brings the existing API app into state management
+import {
+  to = azurerm_container_app.api
+  id = "/subscriptions/039f6f22-d707-42bb-8d89-0125f1069e3f/resourceGroups/rg-guardrail-dev-app/providers/Microsoft.App/containerApps/guardrail-api"
+}
 
-# COMMENTED OUT: Bypasses the broken provisioning states to let Terraform cleanly overwrite them
-# import {
-#   to = azurerm_container_app.worker
-#   id = "/subscriptions/039f6f22-d707-42bb-8d89-0125f1069e3f/resourceGroups/rg-guardrail-dev-app/providers/Microsoft.App/containerApps/guardrail-worker"
-# }
+# RESTORED: Brings the existing Worker app into state management
+import {
+  to = azurerm_container_app.worker
+  id = "/subscriptions/039f6f22-d707-42bb-8d89-0125f1069e3f/resourceGroups/rg-guardrail-dev-app/providers/Microsoft.App/containerApps/guardrail-worker"
+}
 
-# COMMENTED OUT: Bypasses non-existent resource name to prevent plan crashing
+# COMMENTED OUT: Keeping this out since it doesn't exist remotely under this name yet
 # import {
 #   to = azurerm_container_app.frontend
 #   id = "/subscriptions/039f6f22-d707-42bb-8d89-0125f1069e3f/resourceGroups/rg-guardrail-dev-app/providers/Microsoft.App/containerApps/guardrail-frontend"
