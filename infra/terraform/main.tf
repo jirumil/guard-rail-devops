@@ -37,10 +37,11 @@ import {
 #   id = "/subscriptions/039f6f22-d707-42bb-8d89-0125f1069e3f/resourceGroups/rg-guardrail-dev-app/providers/Microsoft.App/containerApps/guardrail-worker"
 # }
 
-import {
-  to = azurerm_container_app.frontend
-  id = "/subscriptions/039f6f22-d707-42bb-8d89-0125f1069e3f/resourceGroups/rg-guardrail-dev-app/providers/Microsoft.App/containerApps/guardrail-frontend"
-}
+# COMMENTED OUT: Bypasses non-existent resource name to prevent plan crashing
+# import {
+#   to = azurerm_container_app.frontend
+#   id = "/subscriptions/039f6f22-d707-42bb-8d89-0125f1069e3f/resourceGroups/rg-guardrail-dev-app/providers/Microsoft.App/containerApps/guardrail-frontend"
+# }
 
 # ---- Container Registry ----
 resource "azurerm_container_registry" "main" {
