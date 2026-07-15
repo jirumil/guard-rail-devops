@@ -21,10 +21,6 @@ import {
 }
 
 # ---- Import Blocks for the Container Apps ----
-import {
-  to = azurerm_container_app.redis
-  id = "/subscriptions/039f6f22-d707-42bb-8d89-0125f1069e3f/resourceGroups/rg-guardrail-dev-app/providers/Microsoft.App/containerApps/guardrail-redis"
-}
 
 import {
   to = azurerm_container_app.api
