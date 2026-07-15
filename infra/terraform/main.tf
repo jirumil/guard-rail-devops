@@ -3,6 +3,12 @@ resource "azurerm_resource_group" "main" {
   location = "southeastasia"
 }
 
+# Add the import block here:
+import {
+  to = azurerm_resource_group.main
+  id = "/subscriptions/039f6f22-d707-42bb-8d89-0125f1069e3f/resourceGroups/rg-guardrail-dev-app"
+}
+
 # ---- Container Registry ----
 resource "azurerm_container_registry" "main" {
   name                = "guardrailcrdev2026v2" # <-- Change to v2
