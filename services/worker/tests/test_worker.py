@@ -6,6 +6,7 @@ _scan_text_content) with no Redis or MinIO involved — importing `worker`
 no longer touches the network at import time (storage is lazy now), so
 these tests run in isolation, fast, with zero live infrastructure.
 """
+
 import os
 
 import worker
@@ -133,12 +134,18 @@ class TestScanFileIntegration:
 
     def test_clean_file_produces_success_status(self, monkeypatch):
         recorded_updates = []
-        monkeypatch.setattr(worker, "update_job", lambda job_id, **fields: recorded_updates.append(fields))
+        monkeypatch.setattr(
+            worker,
+            "update_job",
+            lambda job_id, **fields: recorded_updates.append(fields),
+        )
 
         fake_storage = FakeBlobStorage({"job-1.txt": "nothing suspicious here"})
         monkeypatch.setattr(worker, "_get_storage_client", lambda: fake_storage)
         monkeypatch.setattr(worker.metrics, "incr", lambda *a, **k: None)
-        monkeypatch.setattr(worker.time, "sleep", lambda *_: None)  # skip the artificial delay
+        monkeypatch.setattr(
+            worker.time, "sleep", lambda *_: None
+        )  # skip the artificial delay
 
         worker.scan_file("job-1", "job-1.txt", ".txt", "text/plain", "clean.txt")
 
@@ -149,7 +156,11 @@ class TestScanFileIntegration:
 
     def test_malicious_file_produces_quarantined_verdict(self, monkeypatch):
         recorded_updates = []
-        monkeypatch.setattr(worker, "update_job", lambda job_id, **fields: recorded_updates.append(fields))
+        monkeypatch.setattr(
+            worker,
+            "update_job",
+            lambda job_id, **fields: recorded_updates.append(fields),
+        )
 
         fake_storage = FakeBlobStorage({"job-2.py": "eval(payload)"})
         monkeypatch.setattr(worker, "_get_storage_client", lambda: fake_storage)
@@ -192,12 +203,17 @@ class TestScanFileIntegration:
 
     def test_exception_during_scan_sets_error_status(self, monkeypatch):
         recorded_updates = []
-        monkeypatch.setattr(worker, "update_job", lambda job_id, **fields: recorded_updates.append(fields))
+        monkeypatch.setattr(
+            worker,
+            "update_job",
+            lambda job_id, **fields: recorded_updates.append(fields),
+        )
         monkeypatch.setattr(worker.metrics, "incr", lambda *a, **k: None)
         monkeypatch.setattr(worker.time, "sleep", lambda *_: None)
 
         def broken_storage_client():
             raise ConnectionError("storage unreachable")
+
         monkeypatch.setattr(worker, "_get_storage_client", broken_storage_client)
 
         worker.scan_file("job-4", "job-4.txt", ".txt", "text/plain", "ok.txt")

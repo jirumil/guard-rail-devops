@@ -20,6 +20,7 @@ local disk is reachable — that assumption was the root cause of the
 specifically to support that: the worker's only way to get the file's
 bytes is through this interface, the same as upload always has been.
 """
+
 import os
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta, timezone
@@ -37,8 +38,7 @@ class ObjectStorage(ABC):
         another container's filesystem is reachable."""
 
     @abstractmethod
-    def get_url(self, key: str) -> str:
-        ...
+    def get_url(self, key: str) -> str: ...
 
     @abstractmethod
     def delete(self, key: str) -> None:

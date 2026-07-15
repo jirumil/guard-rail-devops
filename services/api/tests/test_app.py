@@ -3,6 +3,7 @@ Tests for the Flask API routes. app.py's get_redis_conn()/get_queue() are
 lazy singletons specifically so tests can monkeypatch them here instead
 of needing a live Redis server — see the comment in app.py for why.
 """
+
 import io
 
 import fakeredis
@@ -24,6 +25,7 @@ def fake_storage():
     """Records what the API 'uploaded' without touching real storage —
     the API now uploads at ingest time, so every /ingest test needs this
     faked out, the same way Redis and the queue already are."""
+
     class FakeStorage:
         def __init__(self):
             self.uploaded = {}
@@ -136,7 +138,9 @@ class TestIngest:
 
     def test_ingest_rejects_oversized_file(self, client, monkeypatch):
         test_client, _, _ = client
-        monkeypatch.setattr(app_module, "MAX_BYTES", 10)  # shrink the limit for this test
+        monkeypatch.setattr(
+            app_module, "MAX_BYTES", 10
+        )  # shrink the limit for this test
         data = {"file": (io.BytesIO(b"this payload is way over ten bytes"), "big.txt")}
         res = test_client.post("/ingest", data=data, content_type="multipart/form-data")
         assert res.status_code == 413
@@ -159,7 +163,9 @@ class TestStatus:
     def test_status_reflects_ingested_job(self, client):
         test_client, _, _ = client
         data = {"file": (io.BytesIO(b"hello"), "a.txt")}
-        ingest_res = test_client.post("/ingest", data=data, content_type="multipart/form-data")
+        ingest_res = test_client.post(
+            "/ingest", data=data, content_type="multipart/form-data"
+        )
         job_id = ingest_res.get_json()["job_id"]
 
         status_res = test_client.get(f"/status/{job_id}")

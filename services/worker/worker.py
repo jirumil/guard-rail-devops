@@ -24,6 +24,7 @@ def _get_storage_client():
         _storage = get_storage()
     return _storage
 
+
 # --- Threat pattern heuristics ------------------------------------------
 # SIMULATED detection for portfolio/demo purposes — pattern matching, not a
 # real antivirus engine. In production this stage would call something
@@ -64,14 +65,29 @@ SPYWARE_PATTERNS = [
 
 # Only text-scan file types where reading as text is meaningful — scanning
 # arbitrary binary content as UTF-8 text produces noisy false positives.
-TEXT_SCAN_EXTENSIONS = {".txt", ".py", ".js", ".sh", ".php", ".json", ".yml", ".yaml", ".xml", ".html"}
-MAX_SCAN_BYTES = 2 * 1024 * 1024  # bound the read so a huge text file can't stall a worker
+TEXT_SCAN_EXTENSIONS = {
+    ".txt",
+    ".py",
+    ".js",
+    ".sh",
+    ".php",
+    ".json",
+    ".yml",
+    ".yaml",
+    ".xml",
+    ".html",
+}
+MAX_SCAN_BYTES = (
+    2 * 1024 * 1024
+)  # bound the read so a huge text file can't stall a worker
 
 
 SCRATCH_DIR = "/tmp"
 
 
-def scan_file(job_id: str, storage_key: str, ext: str, content_type: str, original_name: str):
+def scan_file(
+    job_id: str, storage_key: str, ext: str, content_type: str, original_name: str
+):
     """RQ entrypoint. Runs in the worker container, isolated from the API's
     request/response cycle — the API's latency never depends on how long
     this function takes or how deep the queue backlog is.
@@ -86,12 +102,22 @@ def scan_file(job_id: str, storage_key: str, ext: str, content_type: str, origin
     scratch_path = f"{SCRATCH_DIR}/{job_id}{ext}"
     try:
         logger.info("scan started job_id=%s filename=%s", job_id, original_name)
-        update_job(job_id, status="scanning", progress=40, detail="Retrieving file from secure storage")
+        update_job(
+            job_id,
+            status="scanning",
+            progress=40,
+            detail="Retrieving file from secure storage",
+        )
 
         storage = _get_storage_client()
         storage.download(storage_key, scratch_path)
 
-        update_job(job_id, status="scanning", progress=50, detail="Running heuristic threat scan")
+        update_job(
+            job_id,
+            status="scanning",
+            progress=50,
+            detail="Running heuristic threat scan",
+        )
         time.sleep(1.2)  # simulate meaningful scan work
 
         findings = _run_heuristics(ext.lower(), scratch_path)
@@ -126,16 +152,29 @@ def scan_file(job_id: str, storage_key: str, ext: str, content_type: str, origin
         _cleanup_local_file(scratch_path)
 
         metrics.incr("scans_total")
-        metrics.incr("scans_clean_total" if verdict == "clean" else "scans_quarantined_total")
+        metrics.incr(
+            "scans_clean_total" if verdict == "clean" else "scans_quarantined_total"
+        )
         for category, count in counts.items():
             if count:
                 metrics.incr(f"findings_{category}_total", count)
 
-        logger.info("scan complete job_id=%s verdict=%s findings=%d", job_id, verdict, len(findings))
+        logger.info(
+            "scan complete job_id=%s verdict=%s findings=%d",
+            job_id,
+            verdict,
+            len(findings),
+        )
 
     except Exception as exc:  # noqa: BLE001
         logger.error("scan failed job_id=%s error=%s", job_id, exc)
-        update_job(job_id, status="error", detail=str(exc), verdict="error", summary="Scan failed")
+        update_job(
+            job_id,
+            status="error",
+            detail=str(exc),
+            verdict="error",
+            summary="Scan failed",
+        )
         metrics.incr("scans_failed_total")
         _cleanup_local_file(scratch_path)
 
@@ -158,15 +197,19 @@ def _run_heuristics(ext: str, local_path: str) -> list[dict]:
     findings = []
 
     if ext in TROJAN_EXTENSIONS:
-        findings.append({
-            "category": "trojan",
-            "detail": f"Executable/dropper extension flagged: {ext}",
-        })
+        findings.append(
+            {
+                "category": "trojan",
+                "detail": f"Executable/dropper extension flagged: {ext}",
+            }
+        )
     if ext in SPYWARE_EXTENSIONS:
-        findings.append({
-            "category": "spyware",
-            "detail": f"Scripting/monitoring-capable extension flagged: {ext}",
-        })
+        findings.append(
+            {
+                "category": "spyware",
+                "detail": f"Scripting/monitoring-capable extension flagged: {ext}",
+            }
+        )
 
     if ext in TEXT_SCAN_EXTENSIONS:
         findings.extend(_scan_text_content(local_path))
@@ -180,17 +223,37 @@ def _scan_text_content(local_path: str) -> list[dict]:
         with open(local_path, "r", errors="ignore") as f:
             content = f.read(MAX_SCAN_BYTES).lower()
     except Exception:
-        return [{"category": "spyware", "detail": "Content unreadable — flagged for manual review"}]
+        return [
+            {
+                "category": "spyware",
+                "detail": "Content unreadable — flagged for manual review",
+            }
+        ]
 
     for pattern in TROJAN_PATTERNS:
         if pattern in content:
-            findings.append({"category": "trojan", "detail": f"Trojan-pattern match: '{pattern.strip()}'"})
+            findings.append(
+                {
+                    "category": "trojan",
+                    "detail": f"Trojan-pattern match: '{pattern.strip()}'",
+                }
+            )
     for pattern in MALWARE_PATTERNS:
         if pattern in content:
-            findings.append({"category": "malware", "detail": f"Malware-pattern match: '{pattern.strip()}'"})
+            findings.append(
+                {
+                    "category": "malware",
+                    "detail": f"Malware-pattern match: '{pattern.strip()}'",
+                }
+            )
     for pattern in SPYWARE_PATTERNS:
         if pattern in content:
-            findings.append({"category": "spyware", "detail": f"Spyware-pattern match: '{pattern.strip()}'"})
+            findings.append(
+                {
+                    "category": "spyware",
+                    "detail": f"Spyware-pattern match: '{pattern.strip()}'",
+                }
+            )
 
     return findings
 

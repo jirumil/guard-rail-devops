@@ -17,6 +17,7 @@ Exit code 0 = clean. Exit code 1 = at least one bad character found,
 with file/line/column reported so it can be fixed in seconds instead of
 debugged from a cryptic runtime NameError in a container log.
 """
+
 import sys
 
 # Characters that render as whitespace but are NOT the ASCII space (0x20)
@@ -43,9 +44,7 @@ def check_file(path: str) -> list[str]:
     for lineno, line in enumerate(lines, start=1):
         for col, char in enumerate(line, start=1):
             if char in SUSPICIOUS_WHITESPACE:
-                problems.append(
-                    f"{path}:{lineno}:{col}: {SUSPICIOUS_WHITESPACE[char]}"
-                )
+                problems.append(f"{path}:{lineno}:{col}: {SUSPICIOUS_WHITESPACE[char]}")
     return problems
 
 
@@ -62,8 +61,14 @@ def main(argv: list[str]) -> int:
         all_problems.extend(check_file(path))
 
     if all_problems:
-        print("Invisible whitespace characters found — these break Python's", file=sys.stderr)
-        print("indentation parser while looking completely normal in your editor:\n", file=sys.stderr)
+        print(
+            "Invisible whitespace characters found — these break Python's",
+            file=sys.stderr,
+        )
+        print(
+            "indentation parser while looking completely normal in your editor:\n",
+            file=sys.stderr,
+        )
         for problem in all_problems:
             print(f"  {problem}", file=sys.stderr)
         print(

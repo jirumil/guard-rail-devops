@@ -4,6 +4,7 @@ API's /metrics route. Counters live in Redis (not in-process) specifically
 because the worker runs as multiple replicas — an in-process counter would
 only ever reflect one replica's activity, not the fleet's.
 """
+
 from jobstate import get_redis
 
 COUNTER_PREFIX = "guardrail:metrics:"

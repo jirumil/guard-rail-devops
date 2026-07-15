@@ -3,6 +3,7 @@ Scan job status is stored as a Redis hash so both the API (writer/reader)
 and the worker (writer) can share state without a database in Phase 1.
 Phase 3: this becomes rows in Postgres, updated via the same job_id key.
 """
+
 import json
 import os
 

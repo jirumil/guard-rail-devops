@@ -14,6 +14,7 @@ specifically because pytest imports app.py / worker.py once per test
 session, and gunicorn's multi-worker model can import the module more
 than once per process — neither should ever produce doubled-up log lines.
 """
+
 import logging
 import sys
 
@@ -38,7 +39,9 @@ def configure_logging(service_name: str, level: int = logging.INFO) -> logging.L
 
     logger.setLevel(level)
     logger.addHandler(handler)
-    logger.propagate = False  # don't also hand lines to the root logger — avoids duplicate output
+    logger.propagate = (
+        False  # don't also hand lines to the root logger — avoids duplicate output
+    )
 
     _configured_loggers.add(service_name)
     return logger

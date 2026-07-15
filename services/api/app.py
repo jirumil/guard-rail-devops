@@ -5,7 +5,12 @@ from pathlib import Path
 
 from flask import Flask, Response, request, jsonify
 from flask_cors import CORS
-from prometheus_client import CollectorRegistry, Gauge, generate_latest, CONTENT_TYPE_LATEST
+from prometheus_client import (
+    CollectorRegistry,
+    Gauge,
+    generate_latest,
+    CONTENT_TYPE_LATEST,
+)
 from redis import Redis
 from rq import Queue
 
@@ -55,7 +60,9 @@ _queue = None
 def get_redis_conn():
     global _redis_conn
     if _redis_conn is None:
-        _redis_conn = Redis.from_url(os.environ.get("REDIS_URL", "redis://redis:6379/0"))
+        _redis_conn = Redis.from_url(
+            os.environ.get("REDIS_URL", "redis://redis:6379/0")
+        )
     return _redis_conn
 
 
@@ -98,22 +105,22 @@ def prometheus_metrics():
     Gauge(
         "guardrail_queue_depth",
         "Jobs waiting to be picked up by a worker",
-        registry=registry
+        registry=registry,
     ).set(len(q))
     Gauge(
         "guardrail_queue_started",
         "Jobs currently being processed by a worker",
-        registry=registry
+        registry=registry,
     ).set(len(q.started_job_registry))
     Gauge(
         "guardrail_queue_failed",
         "Jobs that raised an exception (dead-letter visibility)",
-        registry=registry
+        registry=registry,
     ).set(len(q.failed_job_registry))
     Gauge(
         "guardrail_queue_finished",
         "Jobs completed since the queue was created",
-        registry=registry
+        registry=registry,
     ).set(len(q.finished_job_registry))
 
     counter_metrics = {
@@ -126,11 +133,9 @@ def prometheus_metrics():
         "guardrail_findings_spyware_total": "findings_spyware_total",
     }
     for metric_name, redis_key in counter_metrics.items():
-        Gauge(
-            metric_name,
-            f"GuardRail counter: {redis_key}",
-            registry=registry
-        ).set(metrics.get(redis_key))
+        Gauge(metric_name, f"GuardRail counter: {redis_key}", registry=registry).set(
+            metrics.get(redis_key)
+        )
 
     return Response(generate_latest(registry), mimetype=CONTENT_TYPE_LATEST)
 
@@ -155,7 +160,9 @@ def ingest():
     size = file.tell()
     file.seek(0)
     if size > MAX_BYTES:
-        logger.warning("ingest rejected: %s exceeds size limit (%d bytes)", file.filename, size)
+        logger.warning(
+            "ingest rejected: %s exceeds size limit (%d bytes)", file.filename, size
+        )
         return jsonify(error="file exceeds 100MB limit"), 413
 
     job_id = str(uuid.uuid4())
@@ -177,7 +184,9 @@ def ingest():
             content_type=file.content_type or "application/octet-stream",
         )
     except Exception as exc:
-        logger.error("ingest failed: could not upload %s to storage (%s)", storage_key, exc)
+        logger.error(
+            "ingest failed: could not upload %s to storage (%s)", storage_key, exc
+        )
         return jsonify(error="storage upload failed"), 503
     finally:
         scratch_path.unlink(missing_ok=True)
@@ -210,7 +219,9 @@ def ingest():
         job_timeout=120,
     )
 
-    logger.info("ingested job_id=%s filename=%s size_bytes=%d", job_id, original_name, size)
+    logger.info(
+        "ingested job_id=%s filename=%s size_bytes=%d", job_id, original_name, size
+    )
 
     return jsonify(job_id=job_id, filename=original_name, status="queued"), 202
 
