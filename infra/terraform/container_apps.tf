@@ -1,14 +1,14 @@
 resource "azurerm_container_app_environment" "main" {
   name                       = "cae-${var.project}-${var.environment}"
-  resource_group_name        = azurerm_resource_group.main.name
-  location                   = azurerm_resource_group.main.location
+  resource_group_name        = data.azurerm_resource_group.main.name     # <-- Fixed reference
+  location                   = data.azurerm_resource_group.main.location # <-- Fixed reference
   log_analytics_workspace_id = azurerm_log_analytics_workspace.main.id
 }
 
 # ---- Redis as a Container App (avoids Azure Cache for Redis cost) ----
 resource "azurerm_container_app" "redis" {
   name                         = "${var.project}-redis"
-  resource_group_name          = azurerm_resource_group.main.name
+  resource_group_name          = data.azurerm_resource_group.main.name   # <-- Fixed reference
   container_app_environment_id = azurerm_container_app_environment.main.id
   revision_mode                = "Single"
 
@@ -49,7 +49,7 @@ resource "azurerm_container_app" "redis" {
 # ---- API ----
 resource "azurerm_container_app" "api" {
   name                         = "${var.project}-api"
-  resource_group_name          = azurerm_resource_group.main.name
+  resource_group_name          = data.azurerm_resource_group.main.name   # <-- Fixed reference
   container_app_environment_id = azurerm_container_app_environment.main.id
   revision_mode                = "Single"
 
@@ -113,7 +113,7 @@ resource "azurerm_container_app" "api" {
 # ---- Frontend ----
 resource "azurerm_container_app" "frontend" {
   name                         = "${var.project}-frontend"
-  resource_group_name          = azurerm_resource_group.main.name
+  resource_group_name          = data.azurerm_resource_group.main.name   # <-- Fixed reference
   container_app_environment_id = azurerm_container_app_environment.main.id
   revision_mode                = "Single"
 
