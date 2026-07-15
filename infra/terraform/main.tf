@@ -20,22 +20,6 @@ import {
   id = "/subscriptions/039f6f22-d707-42bb-8d89-0125f1069e3f/resourceGroups/rg-guardrail-dev-app/providers/Microsoft.OperationalInsights/workspaces/log-guardrail-dev"
 }
 
-# ---- Import Blocks for the Container Apps ----
-
-import {
-  to = azurerm_container_app.api
-  id = "/subscriptions/039f6f22-d707-42bb-8d89-0125f1069e3f/resourceGroups/rg-guardrail-dev-app/providers/Microsoft.App/containerApps/guardrail-api"
-}
-
-import {
-  to = azurerm_container_app.worker
-  id = "/subscriptions/039f6f22-d707-42bb-8d89-0125f1069e3f/resourceGroups/rg-guardrail-dev-app/providers/Microsoft.App/containerApps/guardrail-worker"
-}
-
-import {
-  to = azurerm_container_app.frontend
-  id = "/subscriptions/039f6f22-d707-42bb-8d89-0125f1069e3f/resourceGroups/rg-guardrail-dev-app/providers/Microsoft.App/containerApps/guardrail-frontend"
-}
 
 # ---- Container Registry ----
 resource "azurerm_container_registry" "main" {
