@@ -2,9 +2,20 @@ resource "azurerm_resource_group" "main" {
   name     = "rg-guardrail-dev-app"
   location = "southeastasia"
 }
+# ---- Import Blocks to bring existing infra into state ----
 import {
   to = azurerm_resource_group.main
   id = "/subscriptions/039f6f22-d707-42bb-8d89-0125f1069e3f/resourceGroups/rg-guardrail-dev-app"
+}
+
+import {
+  to = azurerm_container_registry.main
+  id = "/subscriptions/039f6f22-d707-42bb-8d89-0125f1069e3f/resourceGroups/rg-guardrail-dev-app/providers/Microsoft.ContainerRegistry/registries/guardrailcrdev2026v2"
+}
+
+import {
+  to = azurerm_log_analytics_workspace.main
+  id = "/subscriptions/039f6f22-d707-42bb-8d89-0125f1069e3f/resourceGroups/rg-guardrail-dev-app/providers/Microsoft.OperationalInsights/workspaces/log-guardrail-dev"
 }
 # ---- Container Registry ----
 resource "azurerm_container_registry" "main" {
