@@ -40,20 +40,19 @@ import {
   id = "/subscriptions/039f6f22-d707-42bb-8d89-0125f1069e3f/resourceGroups/rg-guardrail-dev-app/providers/Microsoft.App/containerApps/guardrail-frontend"
 }
 
-import {
-  to = azurerm_log_analytics_workspace.main
-  id = "/subscriptions/039f6f22-d707-42bb-8d89-0125f1069e3f/resourceGroups/rg-guardrail-dev-app/providers/Microsoft.OperationalInsights/workspaces/log-guardrail-dev"
-}
-
-
 # ---- Container Registry ----
 resource "azurerm_container_registry" "main" {
-  # FIXED: Changed back from v2 to your original registry name
-  name                = "guardrailcrdev2026" 
+  name                = "guardrailcrdev2026"
   resource_group_name = azurerm_resource_group.main.name
   location            = azurerm_resource_group.main.location
   sku                 = "Basic"
   admin_enabled       = true
+}
+
+# ---- Reference the V2 Registry for Image Pulls ----
+data "azurerm_container_registry" "v2" {
+  name                = "guardrailcrdev2026v2"
+  resource_group_name = azurerm_resource_group.main.name
 }
 
 # ---- Log Analytics ----
@@ -63,10 +62,4 @@ resource "azurerm_log_analytics_workspace" "main" {
   location            = azurerm_resource_group.main.location
   sku                 = "PerGB2018"
   retention_in_days   = 30
-}
-
-# ---- Reference the V2 Registry for Image Pulls ----
-data "azurerm_container_registry" "v2" {
-  name                = "guardrailcrdev2026v2"
-  resource_group_name = azurerm_resource_group.main.name
 }
