@@ -1,5 +1,5 @@
 resource "azurerm_container_app_environment" "main" {
-  name                       = "cae-${var.project}-${var.environment}"
+  name                       = "cae-${var.project}-${var.environment}-v2"
   resource_group_name        = data.azurerm_resource_group.main.name     # <-- Fixed reference
   location                   = data.azurerm_resource_group.main.location # <-- Fixed reference
   log_analytics_workspace_id = azurerm_log_analytics_workspace.main.id
