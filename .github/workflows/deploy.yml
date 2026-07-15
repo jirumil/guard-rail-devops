@@ -30,7 +30,7 @@ jobs:
           pip install black==24.4.2 flake8==7.1.0
 
       - name: Lint (flake8)
-        run: flake8 --max-line-length=100 --ignore=E501,E305,W292 common/ services/ scripts/
+        run: flake8 --max-line-length=100 --ignore=E501,E305,W292,E704 common/ services/ scripts/
 
       - name: Format check (black)
         run: black --check common/ services/ scripts/
