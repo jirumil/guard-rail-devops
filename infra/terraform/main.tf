@@ -2,6 +2,7 @@ resource "azurerm_resource_group" "main" {
   name     = "rg-guardrail-dev-app"
   location = "southeastasia"
 }
+
 # ---- Import Blocks to bring existing infra into state ----
 import {
   to = azurerm_resource_group.main
@@ -10,7 +11,8 @@ import {
 
 import {
   to = azurerm_container_registry.main
-  id = "/subscriptions/039f6f22-d707-42bb-8d89-0125f1069e3f/resourceGroups/rg-guardrail-dev-app/providers/Microsoft.ContainerRegistry/registries/guardrailcrdev2026v2"
+  # FIXED: Pointing the import directly to your original registry
+  id = "/subscriptions/039f6f22-d707-42bb-8d89-0125f1069e3f/resourceGroups/rg-guardrail-dev-app/providers/Microsoft.ContainerRegistry/registries/guardrailcrdev2026"
 }
 
 import {
@@ -22,23 +24,37 @@ import {
   to = azurerm_container_app_environment.main
   id = "/subscriptions/039f6f22-d707-42bb-8d89-0125f1069e3f/resourceGroups/rg-guardrail-dev-app/providers/Microsoft.App/managedEnvironments/cae-guardrail-dev"
 }
+
+# ---- Import Blocks for the Container Apps ----
+import {
+  to = azurerm_container_app.redis
+  id = "/subscriptions/039f6f22-d707-42bb-8d89-0125f1069e3f/resourceGroups/rg-guardrail-dev-app/providers/Microsoft.App/containerApps/guardrail-redis"
+}
+
+import {
+  to = azurerm_container_app.api
+  id = "/subscriptions/039f6f22-d707-42bb-8d89-0125f1069e3f/resourceGroups/rg-guardrail-dev-app/providers/Microsoft.App/containerApps/guardrail-api"
+}
+
+import {
+  to = azurerm_container_app.worker
+  id = "/subscriptions/039f6f22-d707-42bb-8d89-0125f1069e3f/resourceGroups/rg-guardrail-dev-app/providers/Microsoft.App/containerApps/guardrail-worker"
+}
+
+import {
+  to = azurerm_container_app.frontend
+  id = "/subscriptions/039f6f22-d707-42bb-8d89-0125f1069e3f/resourceGroups/rg-guardrail-dev-app/providers/Microsoft.App/containerApps/guardrail-frontend"
+}
+
 # ---- Container Registry ----
 resource "azurerm_container_registry" "main" {
-  name                = "guardrailcrdev2026v2" # <-- Change to v2
+  # FIXED: Changed back from v2 to your original registry name
+  name                = "guardrailcrdev2026" 
   resource_group_name = azurerm_resource_group.main.name
   location            = azurerm_resource_group.main.location
   sku                 = "Basic"
   admin_enabled       = true
 }
-
-# ---- Blob Storage ----
-# NOTE: GuardRail's actual storage account (stguardrailscans) is
-# provisioned manually in the portal and referenced via the
-# data "azurerm_storage_account" "guardrail" block in dependencies.tf —
-# only the worker touches storage.py, and it already points there. This
-# Terraform-managed storage account was leftover from an earlier
-# iteration and has been removed to avoid provisioning a second, unused,
-# billable storage account.
 
 # ---- Log Analytics ----
 resource "azurerm_log_analytics_workspace" "main" {
