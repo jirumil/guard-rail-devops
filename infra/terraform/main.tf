@@ -11,8 +11,33 @@ import {
 
 import {
   to = azurerm_container_registry.main
-  # FIXED: Pointing the import directly to your original registry
   id = "/subscriptions/039f6f22-d707-42bb-8d89-0125f1069e3f/resourceGroups/rg-guardrail-dev-app/providers/Microsoft.ContainerRegistry/registries/guardrailcrdev2026"
+}
+
+import {
+  to = azurerm_log_analytics_workspace.main
+  id = "/subscriptions/039f6f22-d707-42bb-8d89-0125f1069e3f/resourceGroups/rg-guardrail-dev-app/providers/Microsoft.OperationalInsights/workspaces/log-guardrail-dev"
+}
+
+# ---- Import Blocks for the Container Apps ----
+import {
+  to = azurerm_container_app.redis
+  id = "/subscriptions/039f6f22-d707-42bb-8d89-0125f1069e3f/resourceGroups/rg-guardrail-dev-app/providers/Microsoft.App/containerApps/guardrail-redis"
+}
+
+import {
+  to = azurerm_container_app.api
+  id = "/subscriptions/039f6f22-d707-42bb-8d89-0125f1069e3f/resourceGroups/rg-guardrail-dev-app/providers/Microsoft.App/containerApps/guardrail-api"
+}
+
+import {
+  to = azurerm_container_app.worker
+  id = "/subscriptions/039f6f22-d707-42bb-8d89-0125f1069e3f/resourceGroups/rg-guardrail-dev-app/providers/Microsoft.App/containerApps/guardrail-worker"
+}
+
+import {
+  to = azurerm_container_app.frontend
+  id = "/subscriptions/039f6f22-d707-42bb-8d89-0125f1069e3f/resourceGroups/rg-guardrail-dev-app/providers/Microsoft.App/containerApps/guardrail-frontend"
 }
 
 import {
