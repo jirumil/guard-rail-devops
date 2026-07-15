@@ -4,9 +4,9 @@
 # QUEUE NAME CORRECTION — READ THIS FIRST:
 # You specified `rq:queue:default` in your requirements. That is NOT this
 # codebase's actual queue name. GuardRail's Flask API creates its queue as:
-#       Queue("file-scanning", connection=get_redis_conn())      # app.py
+#       Queue("file-scanning", connection=get_redis_conn())       # app.py
 # and the worker's Dockerfile CMD listens on the same name:
-#       rq worker file-scanning --path . --url redis://...        # Dockerfile
+#       rq worker file-scanning --path . --url redis://...         # Dockerfile
 #
 # RQ stores pending jobs in Redis under the key `rq:queue:<name>` — so the
 # correct list for KEDA to watch is `rq:queue:file-scanning`, not
@@ -22,14 +22,14 @@ resource "azurerm_container_app" "worker" {
   revision_mode                = "Single"
 
   registry {
-    server               = azurerm_container_registry.main.login_server
-    username             = azurerm_container_registry.main.admin_username
+    server               = data.azurerm_container_registry.main.login_server
+    username             = data.azurerm_container_registry.main.admin_username
     password_secret_name = "acr-password"
   }
 
   secret {
     name  = "acr-password"
-    value = azurerm_container_registry.main.admin_password
+    value = data.azurerm_container_registry.main.admin_password
   }
   secret {
     name  = "redis-password"
@@ -44,7 +44,7 @@ resource "azurerm_container_app" "worker" {
     container {
       name   = "worker"
       # FIXED: Points directly to latest tag to capture your clean, manual docker pushes
-      image  = "${azurerm_container_registry.main.login_server}/guardrail-worker:latest"
+      image  = "${data.azurerm_container_registry.main.login_server}/guardrail-worker:latest"
       cpu    = "0.25"
       memory = "0.5Gi"
 
@@ -54,12 +54,12 @@ resource "azurerm_container_app" "worker" {
         "worker",
         "file-scanning",
         "--url",
-        "redis://:${random_password.redis.result}@${azurerm_container_app.redis.name}:6379/0"
+        "redis://:${random_password.redis.result}@${data.azurerm_container_app.redis.name}:6379/0"
       ]
 
       env {
         name  = "REDIS_URL"
-        value = "redis://:${random_password.redis.result}@${azurerm_container_app.redis.name}:6379/0"
+        value = "redis://:${random_password.redis.result}@${data.azurerm_container_app.redis.name}:6379/0"
       }
       # REDEPLOY_TRICK removed — see the matching comment in
       # container_apps.tf for why it's structurally unnecessary now.
@@ -91,7 +91,7 @@ resource "azurerm_container_app" "worker" {
 
       metadata = {
         # KEDA requires the internal FQDN string to route through the environment mesh proxy
-        host                  = azurerm_container_app.redis.ingress[0].fqdn
+        host                  = data.azurerm_container_app.redis.ingress[0].fqdn
         port                  = "6379"
         listName              = "rq:queue:file-scanning"
         listLength            = "5"                      
