@@ -1,15 +1,13 @@
-resource "azurerm_container_app_environment" "main" {
-  name                       = "cae-${var.project}-${var.environment}"
-  resource_group_name        = azurerm_resource_group.main.name
-  location                   = azurerm_resource_group.main.location
-  log_analytics_workspace_id = azurerm_log_analytics_workspace.main.id
+data "azurerm_container_app_environment" "main" {
+  name                = "cae-guardrail-dev"
+  resource_group_name = azurerm_resource_group.main.name
 }
 
 # ---- Redis as a Container App (avoids Azure Cache for Redis cost) ----
 resource "azurerm_container_app" "redis" {
   name                         = "${var.project}-redis"
   resource_group_name          = azurerm_resource_group.main.name
-  container_app_environment_id = azurerm_container_app_environment.main.id
+  container_app_environment_id = data.azurerm_container_app_environment.main.id
   revision_mode                = "Single"
 
   secret {
@@ -50,7 +48,7 @@ resource "azurerm_container_app" "redis" {
 resource "azurerm_container_app" "api" {
   name                         = "${var.project}-api"
   resource_group_name          = azurerm_resource_group.main.name
-  container_app_environment_id = azurerm_container_app_environment.main.id
+  container_app_environment_id = data.azurerm_container_app_environment.main.id
   revision_mode                = "Single"
 
   registry {
@@ -114,7 +112,7 @@ resource "azurerm_container_app" "api" {
 resource "azurerm_container_app" "frontend" {
   name                         = "${var.project}-frontend"
   resource_group_name          = azurerm_resource_group.main.name
-  container_app_environment_id = azurerm_container_app_environment.main.id
+  container_app_environment_id = data.azurerm_container_app_environment.main.id
   revision_mode                = "Single"
 
   registry {

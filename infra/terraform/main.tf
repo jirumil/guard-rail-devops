@@ -20,11 +20,6 @@ import {
   id = "/subscriptions/039f6f22-d707-42bb-8d89-0125f1069e3f/resourceGroups/rg-guardrail-dev-app/providers/Microsoft.OperationalInsights/workspaces/log-guardrail-dev"
 }
 
-import {
-  to = azurerm_container_app_environment.main
-  id = "/subscriptions/039f6f22-d707-42bb-8d89-0125f1069e3f/resourceGroups/rg-guardrail-dev-app/providers/Microsoft.App/managedEnvironments/cae-guardrail-dev"
-}
-
 # ---- Import Blocks for the Container Apps ----
 import {
   to = azurerm_container_app.redis
