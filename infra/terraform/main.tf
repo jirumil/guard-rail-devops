@@ -39,3 +39,9 @@ resource "azurerm_log_analytics_workspace" "main" {
   sku                 = "PerGB2018"
   retention_in_days   = 30
 }
+
+# ---- Reference the V2 Registry for Image Pulls ----
+data "azurerm_container_registry" "v2" {
+  name                = "guardrailcrdev2026v2"
+  resource_group_name = azurerm_resource_group.main.name
+}

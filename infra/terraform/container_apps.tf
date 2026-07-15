@@ -65,9 +65,9 @@ resource "azurerm_container_app" "api" {
   template {
     container {
       name   = "api"
-      image  = "${azurerm_container_registry.main.login_server}/guardrail-api:${var.api_image_tag}"
-      cpu    = 0.5
-      memory = "1Gi"
+      image  = "${data.azurerm_container_registry.v2.login_server}/guardrail-api:${var.image_tag}" 
+      cpu    = "0.5"
+      memory = "1.0Gi"
 
       # FIXED: Added Gunicorn tuning configurations to stop it killing its own workers early
       env {
@@ -115,7 +115,7 @@ resource "azurerm_container_app" "frontend" {
   container_app_environment_id = data.azurerm_container_app_environment.main.id
   revision_mode                = "Single"
 
-  registry {
+  registry {  
     server               = azurerm_container_registry.main.login_server
     username             = azurerm_container_registry.main.admin_username
     password_secret_name = "acr-password"

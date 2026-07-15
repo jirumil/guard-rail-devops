@@ -44,9 +44,9 @@ resource "azurerm_container_app" "worker" {
     container {
       name   = "worker"
       # FIXED: Points directly to latest tag to capture your clean, manual docker pushes
-      image  = "${azurerm_container_registry.main.login_server}/guardrail-worker:latest"
-      cpu    = "0.25"
-      memory = "0.5Gi"
+      image  = "${data.azurerm_container_registry.v2.login_server}/guardrail-worker:latest"
+      cpu    = "0.5"
+      memory = "1.0Gi"
 
       # FIXED: Changed from ingress[0].fqdn to .name here as well for native Layer-4 TCP routing
       command = [
